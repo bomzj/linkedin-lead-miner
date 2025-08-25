@@ -63,8 +63,13 @@ class EmailSpider(scrapy.Spider):
             # How many requests we could send to this domain
             links_limit = self.max_pages_per_domain - self.pages_crawled_per_domain[current_domain]
             
-            for link in prioritized_links[:links_limit]:
-                yield scrapy.Request(link.url, callback=self.parse)
+            for index, link in enumerate(prioritized_links[:links_limit]):
+                yield scrapy.Request(
+                    link.url,
+                    callback=self.parse,
+                    priority=len(prioritized_links) - index  # higher for earlier links
+                )
+
 
     @classmethod
     def from_crawler(cls, crawler, *args, **kwargs):
