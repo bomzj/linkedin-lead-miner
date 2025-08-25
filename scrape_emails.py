@@ -74,7 +74,7 @@ settings = {
 ## Main
 
 # Collect start urls from companies input file
-input_file = sys.argv[1] or 'companies.json'
+input_file = sys.argv[1] if len(sys.argv) == 2 else 'companies.json'
 
 with open(input_file, 'r') as f:
     data = json.load(f)
