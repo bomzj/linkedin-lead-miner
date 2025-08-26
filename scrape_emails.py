@@ -40,6 +40,9 @@ settings = {
     "DOWNLOAD_TIMEOUT": 10,  # Short timeout to fail fast
     "RETRY_TIMES": 1,  # Only retry once
     "REDIRECT_MAX_TIMES": 3,  # Limit redirect
+    # Change default Scrapy UA to look like a browser to bypass some restrictions
+    "USER_AGENT": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                    "(KHTML, like Gecko) Chrome/128.0 Safari/537.36",
 
     # Additional custom EmailScraper settings
     
