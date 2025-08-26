@@ -155,9 +155,9 @@ priority_email_keywords = [
     "team",
 
     # More generic emails but still more relevant than some random addresses
+    "hello",
     "contact",
     "info",
-    "hello",
     "general",
     "inquiry",
     "office"
