@@ -3,6 +3,7 @@ import scrapy
 from scrapy.linkextractors import LinkExtractor
 from urllib.parse import urlparse, urlunparse
 
+
 class EmailSpider(scrapy.Spider):
     name = 'email_spider'
 
@@ -11,34 +12,49 @@ class EmailSpider(scrapy.Spider):
 
         # Split the comma-separated start URLs into a list
         if isinstance(start_urls, str):
-            self.start_urls = start_urls.split(',')
-        else:
-            self.start_urls = start_urls
-        
-        self.start_urls = ensure_urls_valid(self.start_urls)
+            start_urls = start_urls.split(',')
+
+        self.start_urls = ensure_urls_valid(start_urls)
 
         # Use default values that will be overridden by from_crawler()
         self.max_pages_per_domain = 50
         self.priority_url_keywords = []
 
         # Set to store already found emails
-        self.found_emails = set()
+        self.found_emails = []
 
          # Counter to track pages crawled per domain
         self.pages_crawled_per_domain = defaultdict(int)
 
+
+    def start_requests(self):
+        for url in self.start_urls:
+            yield scrapy.Request(
+                url,
+                callback=self.parse,
+                # keep original domain for matching scrapped emails with source domain later
+                # in case of redirect to new domain, or some sites can have different email domains
+                meta={'origin_domain': domain(url)}
+            )
+
+
     def parse(self, response):
+        origin_domain = response.meta['origin_domain']
         current_domain = domain(response.url)
 
         # Use the efficient email extraction function, 
         # NOTE: regex is very slow against whole response
         emails = extract_emails(response.text, current_domain)
         
-        # Only yield emails that haven't been found yet
         for email in emails:
-            if email not in self.found_emails:
-                self.found_emails.add(email)
-                yield { 'email': email }
+            scrapped_item = {
+                'email': email,
+                'origin_domain': origin_domain
+            }
+            # TODO: use item pipeline instead of accumulated found_emails property
+            #  https://docs.scrapy.org/en/latest/topics/item-pipeline.html#topics-item-pipeline
+            self.found_emails.append(scrapped_item)
+            yield scrapped_item
 
         # Increment the counter for this domain
         self.pages_crawled_per_domain[current_domain] += 1
@@ -67,7 +83,8 @@ class EmailSpider(scrapy.Spider):
                 yield scrapy.Request(
                     link.url,
                     callback=self.parse,
-                    priority=len(prioritized_links) - index  # higher for earlier links
+                    priority=len(prioritized_links) - index,  # higher for earlier links
+                    meta={'origin_domain': origin_domain}  # propagate
                 )
 
 
@@ -79,13 +96,16 @@ class EmailSpider(scrapy.Spider):
         spider.priority_url_keywords = crawler.settings.get('PRIORITY_URL_KEYWORDS', [])
         return spider
 
+
 def domain(url):
     parsed_url = urlparse(url)
     return parsed_url.netloc
 
+
 def remove_fragment(url):
     parsed = urlparse(url)
     return urlunparse(parsed._replace(fragment=''))
+
 
 def ensure_urls_valid(urls):
     # Avoid missing scheme errors
@@ -95,6 +115,7 @@ def ensure_urls_valid(urls):
             url = "https://" + url  # Assume HTTPS by default
         valid_urls.append(url)
     return valid_urls
+
 
 def prioritize_links(links, priority_keywords):
     """Sort links based on highest priority keyword found in the URL path.
@@ -113,6 +134,7 @@ def prioritize_links(links, priority_keywords):
         return len(priority_keywords) + 1
     
     return sorted(links, key=priority_score)
+
 
 def extract_emails(text, domain):
     target = "@" + domain.replace('www.', '')
