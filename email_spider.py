@@ -1,4 +1,5 @@
 from collections import defaultdict
+import re
 import scrapy
 from scrapy.linkextractors import LinkExtractor
 from urllib.parse import urlparse, urlunparse
@@ -118,21 +119,25 @@ def ensure_urls_valid(urls):
 
 
 def prioritize_links(links, priority_keywords):
-    """Sort links based on highest priority keyword found in the URL path.
-    
-    1. Only checks the URL path for the first matching keyword.
-    2. Priority is based on the keyword position in the priority_keywords list.
-    3. URLs whose paths don't match any keyword have the lowest priority.
-    """
+    """Sort links so that whole-word keyword matches rank higher than partial matches."""
     def priority_score(link):
         path = urlparse(link.url).path.lower()
+
+        for index, keyword in enumerate(priority_keywords):
+            kw = re.escape(keyword.lower())
+
+            # Check whole word match first (higher priority)
+            if re.search(rf'\b{kw}\b', path):
+                return index  # exact match - highest priority
+
+        # If no exact matches, check for partial matches but add penalty
         for index, keyword in enumerate(priority_keywords):
             if keyword.lower() in path:
-                # Lower index means higher priority
-                return index
-        # If no keywords match, return a value higher than any index
-        return len(priority_keywords) + 1
-    
+                return index + len(priority_keywords)  # penalty pushes lower
+
+        # If no matches at all
+        return float('inf')
+
     return sorted(links, key=priority_score)
 
 
